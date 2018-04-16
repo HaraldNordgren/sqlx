@@ -166,6 +166,12 @@ type Person2 struct {
 	Email     sql.NullString
 }
 
+type Person3 struct {
+	FirstName string `db:"first_name"`
+	Email     string
+	AddedAt   time.Time `db:"added_at"`
+}
+
 type Place struct {
 	Country string
 	City    sql.NullString
@@ -380,19 +386,19 @@ func TestMissingNames(t *testing.T) {
 
 func TestMissingDestination(t *testing.T) {
 	testCases := []struct {
-		TestName     string
-		Given        interface{}
+		TestName      string
+		Given         interface{}
 		ExpectedError string
 	}{
 		{
-			TestName:     "BasicSlice",
-			Given:        &[]Person2{},
-			ExpectedError: "missing destination field 'added_at' in sqlx.Person2",
+			TestName:      "BasicSlice",
+			Given:         &[]Person3{},
+			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
 		},
 		{
-			TestName:     "SliceOfPointers",
-			Given:        &[]*Person2{},
-			ExpectedError: "missing destination field 'added_at' in sqlx.Person2",
+			TestName:      "SliceOfPointers",
+			Given:         &[]*Person3{},
+			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
 		},
 	}
 
@@ -406,6 +412,22 @@ func TestMissingDestination(t *testing.T) {
 					t.Fatalf("unexpected error %q, expected %q", err.Error(), tc.ExpectedError)
 				}
 			})
+		}
+	})
+}
+
+func TestResolveAsterisk(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		var people []Person3
+		err := db.SelectResolveAsterisk(&people, `SELECT * FROM person`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range people {
+			if len(p.FirstName) == 0 {
+				t.Errorf("Expected non-zero lengthed first name.")
+			}
 		}
 	})
 }

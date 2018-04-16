@@ -330,9 +330,12 @@ func replaceAsterisk(dest interface{}, query string) string {
 		return query
 	}
 	t := reflectx.UnderlyingType(dest)
-	tags := make([]string, t.NumField())
+	var tags []string
 	for i := 0; i < t.NumField(); i++ {
-		tags[i] = t.Field(i).Tag.Get("db")
+		tag := t.Field(i).Tag.Get("db")
+		if tag != "" {
+			tags = append(tags, tag)
+		}
 	}
 	formattedTags := strings.Join(tags, ", ")
 	return matches[1] + formattedTags + matches[3]
