@@ -378,6 +378,38 @@ func TestMissingNames(t *testing.T) {
 	})
 }
 
+func TestMissingDestination(t *testing.T) {
+	testCases := []struct {
+		TestName     string
+		Given        interface{}
+		ExpectedError string
+	}{
+		{
+			TestName:     "BasicSlice",
+			Given:        &[]Person2{},
+			ExpectedError: "missing destination field 'added_at' in sqlx.Person2",
+		},
+		{
+			TestName:     "SliceOfPointers",
+			Given:        &[]*Person2{},
+			ExpectedError: "missing destination field 'added_at' in sqlx.Person2",
+		},
+	}
+
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		for _, tc := range testCases {
+			t.Run(tc.TestName, func(t *testing.T) {
+				var statement = `SELECT * FROM person`
+				err := db.Select(tc.Given, statement)
+				if err.Error() != tc.ExpectedError {
+					t.Fatalf("unexpected error %q, expected %q", err.Error(), tc.ExpectedError)
+				}
+			})
+		}
+	})
+}
+
 func TestEmbeddedStructs(t *testing.T) {
 	type Loop1 struct{ Person }
 	type Loop2 struct{ Loop1 }
