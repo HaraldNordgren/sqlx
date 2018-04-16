@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -33,6 +34,8 @@ var mpr *reflectx.Mapper
 
 // mprMu protects mpr.
 var mprMu sync.Mutex
+
+var selectAsteriskRegex = regexp.MustCompile("(?is)(\\s*select\\s+)(\\*)(.*)")
 
 // mapper returns a valid mapper using the configured NameMapper func.
 func mapper() *reflectx.Mapper {
@@ -319,6 +322,42 @@ func (db *DB) NamedExec(query string, arg interface{}) (sql.Result, error) {
 // Any placeholder parameters are replaced with supplied args.
 func (db *DB) Select(dest interface{}, query string, args ...interface{}) error {
 	return Select(db, dest, query, args...)
+}
+
+func underlyingType(dest interface{}) reflect.Type {
+	t := reflect.TypeOf(dest)
+	for {
+		switch t.Kind() {
+		case reflect.Array, reflect.Chan, reflect.Map, reflect.Ptr, reflect.Slice:
+			t = t.Elem()
+		default:
+			return t
+		}
+	}
+}
+
+func replaceAsterisk(dest interface{}, query string) string {
+	matches := selectAsteriskRegex.FindStringSubmatch(query)
+	if len(matches) != 4 {
+		return query
+	}
+	t := underlyingType(dest)
+	tags := make([]string, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		tags[i] = t.Field(i).Tag.Get("db")
+	}
+	formattedTags := strings.Join(tags, ", ")
+	return matches[1] + formattedTags + matches[3]
+}
+
+// SelectResolveAsterisk using this DB.
+// Same as Select but with the asterisk in the 'select *' part of the query
+// replaced by the db:"..." tags from dest, to avoid trying to read database
+// fields that have no counterpart in the receiver. For statements without an
+// asterisk select the method behaves exactly like Select.
+func (db *DB) SelectResolveAsterisk(dest interface{}, query string, args ...interface{}) error {
+	query = replaceAsterisk(dest, query)
+	return db.Select(dest, query, args...)
 }
 
 // Get using this DB.
@@ -941,7 +980,8 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 		fields := m.TraversalsByName(base, columns)
 		// if we are not unsafe and are missing fields, return an error
 		if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
-			return fmt.Errorf("missing destination name %s in %T", columns[f], dest)
+			destName := underlyingType(dest).String()
+			return fmt.Errorf("missing destination field '%s' in %s", columns[f], destName)
 		}
 		values = make([]interface{}, len(columns))
 
