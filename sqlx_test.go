@@ -384,54 +384,6 @@ func TestMissingNames(t *testing.T) {
 	})
 }
 
-func TestMissingDestination(t *testing.T) {
-	testCases := []struct {
-		TestName      string
-		Given         interface{}
-		ExpectedError string
-	}{
-		{
-			TestName:      "BasicSlice",
-			Given:         &[]Person3{},
-			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
-		},
-		{
-			TestName:      "SliceOfPointers",
-			Given:         &[]*Person3{},
-			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
-		},
-	}
-
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
-		loadDefaultFixture(db, t)
-		for _, tc := range testCases {
-			t.Run(tc.TestName, func(t *testing.T) {
-				var statement = `SELECT * FROM person`
-				err := db.Select(tc.Given, statement)
-				if err.Error() != tc.ExpectedError {
-					t.Fatalf("unexpected error %q, expected %q", err.Error(), tc.ExpectedError)
-				}
-			})
-		}
-	})
-}
-
-func TestResolveAsterisk(t *testing.T) {
-	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
-		loadDefaultFixture(db, t)
-		var people []Person3
-		err := db.SelectResolveAsterisk(&people, `SELECT * FROM person`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, p := range people {
-			if len(p.FirstName) == 0 {
-				t.Errorf("Expected non-zero lengthed first name.")
-			}
-		}
-	})
-}
-
 func TestEmbeddedStructs(t *testing.T) {
 	type Loop1 struct{ Person }
 	type Loop2 struct{ Loop1 }
@@ -1338,6 +1290,54 @@ func TestUsage(t *testing.T) {
 		for _, val := range nsdest {
 			if val.Valid && val.String != "New York" {
 				t.Errorf("expected single valid result to be `New York`, but got %s", val.String)
+			}
+		}
+	})
+}
+
+func TestMissingDestination(t *testing.T) {
+	testCases := []struct {
+		TestName      string
+		Given         interface{}
+		ExpectedError string
+	}{
+		{
+			TestName:      "BasicSlice",
+			Given:         &[]Person3{},
+			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
+		},
+		{
+			TestName:      "SliceOfPointers",
+			Given:         &[]*Person3{},
+			ExpectedError: "missing destination field 'last_name' in sqlx.Person3",
+		},
+	}
+
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		for _, tc := range testCases {
+			t.Run(tc.TestName, func(t *testing.T) {
+				var statement = `SELECT * FROM person`
+				err := db.Select(tc.Given, statement)
+				if err.Error() != tc.ExpectedError {
+					t.Fatalf("unexpected error %q, expected %q", err.Error(), tc.ExpectedError)
+				}
+			})
+		}
+	})
+}
+
+func TestResolveAsterisk(t *testing.T) {
+	RunWithSchema(defaultSchema, t, func(db *DB, t *testing.T) {
+		loadDefaultFixture(db, t)
+		var people []Person3
+		err := db.SelectResolveAsterisk(&people, `SELECT * FROM person`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range people {
+			if len(p.FirstName) == 0 {
+				t.Errorf("Expected non-zero lengthed first name.")
 			}
 		}
 	})

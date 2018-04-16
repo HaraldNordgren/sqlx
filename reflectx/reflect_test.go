@@ -1014,7 +1014,7 @@ func TestUnderlyingType(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run("", func(t *testing.T) {
+		t.Run(tc.TestName, func(t *testing.T) {
 			actualType := UnderlyingType(tc.Given)
 			if actualType != tc.ExpectedType {
 				t.Errorf("expected %s, got %s", actualType, tc.ExpectedType)
