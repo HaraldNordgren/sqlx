@@ -324,24 +324,12 @@ func (db *DB) Select(dest interface{}, query string, args ...interface{}) error 
 	return Select(db, dest, query, args...)
 }
 
-func underlyingType(dest interface{}) reflect.Type {
-	t := reflect.TypeOf(dest)
-	for {
-		switch t.Kind() {
-		case reflect.Array, reflect.Chan, reflect.Map, reflect.Ptr, reflect.Slice:
-			t = t.Elem()
-		default:
-			return t
-		}
-	}
-}
-
 func replaceAsterisk(dest interface{}, query string) string {
 	matches := selectAsteriskRegex.FindStringSubmatch(query)
 	if len(matches) != 4 {
 		return query
 	}
-	t := underlyingType(dest)
+	t := reflectx.UnderlyingType(dest)
 	tags := make([]string, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		tags[i] = t.Field(i).Tag.Get("db")
@@ -980,7 +968,7 @@ func scanAll(rows rowsi, dest interface{}, structOnly bool) error {
 		fields := m.TraversalsByName(base, columns)
 		// if we are not unsafe and are missing fields, return an error
 		if f, err := missingFields(fields); err != nil && !isUnsafe(rows) {
-			destName := underlyingType(dest).String()
+			destName := reflectx.UnderlyingType(dest).String()
 			return fmt.Errorf("missing destination field '%s' in %s", columns[f], destName)
 		}
 		values = make([]interface{}, len(columns))
